@@ -2,7 +2,7 @@
 
 > 법원경매 물건을 수집해 유찰 횟수별 할인율을 분석하는 Streamlit 대시보드
 
-**Live demo**: [DEMO_URL]
+**Live demo**: https://auctionote-g5gndhc2ri3ca5h6qbyappb.streamlit.app/
 
 ![dashboard](docs/screenshots/01_overview.png)
 
