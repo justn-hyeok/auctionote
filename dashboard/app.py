@@ -2,21 +2,25 @@
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 
-import folium
-import pandas as pd
-import plotly.express as px
-import streamlit as st
-from streamlit_folium import st_folium
-
-from analysis.schema import AuctionItem
-from analysis.stats import failed_count_discount_stats
-from crawler.parse import parse_detail
-from storage.sqlite import init_db, load_all, save
-
 ROOT = Path(__file__).resolve().parent.parent
-DB_PATH = ROOT / "data" / "auction.db"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import folium  # noqa: E402
+import pandas as pd  # noqa: E402
+import plotly.express as px  # noqa: E402
+import streamlit as st  # noqa: E402
+from streamlit_folium import st_folium  # noqa: E402
+
+from analysis.schema import AuctionItem  # noqa: E402
+from analysis.stats import failed_count_discount_stats  # noqa: E402
+from crawler.parse import parse_detail  # noqa: E402
+from storage.sqlite import init_db, load_all, save  # noqa: E402
+
+DB_PATH = ROOT / "data" / "auctionote.db"
 FIXTURES_RAW = ROOT / "fixtures" / "raw"
 
 COURT_COORDS: dict[str, tuple[float, float]] = {
