@@ -4,7 +4,8 @@ __pycache__/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
-data/
+data/*
 !data/.gitkeep
+!data/auctionote.db
 .streamlit/secrets.toml
 .DS_Store
