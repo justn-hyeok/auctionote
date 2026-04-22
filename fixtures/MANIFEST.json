@@ -1,0 +1,79 @@
+{
+  "collected_at": "2026-04-22T09:11:00+09:00",
+  "source_base_url": "https://www.courtauction.go.kr",
+  "robots_txt_checked": true,
+  "robots_txt_snippet": "404 Not Found — server returned a 29030-byte HTML error page (시스템안내) instead of a robots.txt resource. No explicit Disallow applies; crawl target is inaccessible for an independent reason (WebSquare SPA).",
+  "mode": "synthetic",
+  "synthesis_note": "Live crawling abandoned: courtauction.go.kr is a WebSquare SPA whose data is loaded via XHR submodel after JS bootstrap; static HTTP GET returns an empty shell. Playwright + WebSquare reverse-engineering is beyond Phase A scope. See fixtures/LIVE_CRAWL_ABANDONED.md. Fixtures below are hand-authored to exercise the parser / stats / storage / dashboard contract. Real data source for later phases should be 공공데이터포털 법원경매정보 Open API (data.go.kr).",
+  "coverage": {
+    "use_types": [
+      "근린생활시설",
+      "다세대",
+      "아파트",
+      "토지"
+    ],
+    "failed_counts": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "area_m2_null_case": true
+  },
+  "files": [
+    {
+      "raw": "fixtures/raw/detail_apt_1.html",
+      "expected": "fixtures/expected/detail_apt_1.json",
+      "type": "detail",
+      "use_type": "아파트",
+      "failed_count": 0
+    },
+    {
+      "raw": "fixtures/raw/detail_apt_2.html",
+      "expected": "fixtures/expected/detail_apt_2.json",
+      "type": "detail",
+      "use_type": "아파트",
+      "failed_count": 1
+    },
+    {
+      "raw": "fixtures/raw/detail_apt_3.html",
+      "expected": "fixtures/expected/detail_apt_3.json",
+      "type": "detail",
+      "use_type": "아파트",
+      "failed_count": 2
+    },
+    {
+      "raw": "fixtures/raw/detail_villa_1.html",
+      "expected": "fixtures/expected/detail_villa_1.json",
+      "type": "detail",
+      "use_type": "다세대",
+      "failed_count": 1
+    },
+    {
+      "raw": "fixtures/raw/detail_land_1.html",
+      "expected": "fixtures/expected/detail_land_1.json",
+      "type": "detail",
+      "use_type": "토지",
+      "failed_count": 3
+    },
+    {
+      "raw": "fixtures/raw/detail_shop_1.html",
+      "expected": "fixtures/expected/detail_shop_1.json",
+      "type": "detail",
+      "use_type": "근린생활시설",
+      "failed_count": 0
+    },
+    {
+      "raw": "fixtures/raw/list_page_01.html",
+      "expected": "fixtures/expected/list_page_01.json",
+      "type": "list",
+      "page": 1
+    },
+    {
+      "raw": "fixtures/raw/list_page_02.html",
+      "expected": "fixtures/expected/list_page_02.json",
+      "type": "list",
+      "page": 2
+    }
+  ]
+}

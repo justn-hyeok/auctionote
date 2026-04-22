@@ -1,0 +1,14 @@
+{
+  "case_no": "2024타경30001",
+  "item_no": 2,
+  "court": "인천지방법원",
+  "auction_date": "2026-06-11",
+  "appraisal_price": 500000000,
+  "min_bid_price": 256000000,
+  "failed_count": 3,
+  "use_type": "토지",
+  "status": "유찰",
+  "address": "인천광역시 서구 검단동 200-5",
+  "area_m2": 230.5,
+  "source_url": "/pgj/detail/2024-30001/2"
+}

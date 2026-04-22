@@ -1,0 +1,22 @@
+2026-04-22T09:07:40+09:00 GET https://www.courtauction.go.kr/robots.txt -> 404 (29030 bytes, HTML error page)
+2026-04-22T09:07:44+09:00 GET https://www.courtauction.go.kr/ -> 200 (847 bytes, JS redirect to /pgj/index.on)
+2026-04-22T09:07:54+09:00 GET https://www.courtauction.go.kr/pgj/index.on -> 200 (2642 bytes, WebSquare SPA shell)
+2026-04-22T09:10:00+09:00 ABANDON live crawling: WebSquare SPA requires Playwright + XHR/session reverse-engineering beyond Phase A scope
+2026-04-22T09:10:05+09:00 PIVOT to synthesis mode (plan B); see fixtures/LIVE_CRAWL_ABANDONED.md
+2026-04-22T09:11:00+09:00 SAVE fixtures/raw/detail_apt_1.html (synthetic)
+2026-04-22T09:11:00+09:00 SAVE fixtures/expected/detail_apt_1.json (oracle)
+2026-04-22T09:11:00+09:00 SAVE fixtures/raw/detail_apt_2.html (synthetic)
+2026-04-22T09:11:00+09:00 SAVE fixtures/expected/detail_apt_2.json (oracle)
+2026-04-22T09:11:00+09:00 SAVE fixtures/raw/detail_apt_3.html (synthetic)
+2026-04-22T09:11:00+09:00 SAVE fixtures/expected/detail_apt_3.json (oracle)
+2026-04-22T09:11:00+09:00 SAVE fixtures/raw/detail_villa_1.html (synthetic)
+2026-04-22T09:11:00+09:00 SAVE fixtures/expected/detail_villa_1.json (oracle)
+2026-04-22T09:11:00+09:00 SAVE fixtures/raw/detail_land_1.html (synthetic)
+2026-04-22T09:11:00+09:00 SAVE fixtures/expected/detail_land_1.json (oracle)
+2026-04-22T09:11:00+09:00 SAVE fixtures/raw/detail_shop_1.html (synthetic)
+2026-04-22T09:11:00+09:00 SAVE fixtures/expected/detail_shop_1.json (oracle)
+2026-04-22T09:11:05+09:00 SAVE fixtures/raw/list_page_01.html (synthetic)
+2026-04-22T09:11:05+09:00 SAVE fixtures/expected/list_page_01.json (oracle)
+2026-04-22T09:11:05+09:00 SAVE fixtures/raw/list_page_02.html (synthetic)
+2026-04-22T09:11:05+09:00 SAVE fixtures/expected/list_page_02.json (oracle)
+2026-04-22T09:11:10+09:00 SAVE fixtures/MANIFEST.json
