@@ -2,9 +2,9 @@
   "collected_at": "2026-04-22T09:11:00+09:00",
   "source_base_url": "https://www.courtauction.go.kr",
   "robots_txt_checked": true,
-  "robots_txt_snippet": "404 Not Found — server returned a 29030-byte HTML error page (시스템안내) instead of a robots.txt resource. No explicit Disallow applies; crawl target is inaccessible for an independent reason (WebSquare SPA).",
+  "robots_txt_snippet": "404 Not Found — server returned a 29030-byte HTML error page (시스템안내) instead of a robots.txt resource. No explicit Disallow applies.",
   "mode": "synthetic",
-  "synthesis_note": "Live crawling abandoned: courtauction.go.kr is a WebSquare SPA whose data is loaded via XHR submodel after JS bootstrap; static HTTP GET returns an empty shell. Playwright + WebSquare reverse-engineering is beyond Phase A scope. See fixtures/LIVE_CRAWL_ABANDONED.md. Fixtures below are hand-authored to exercise the parser / stats / storage / dashboard contract. Real data source for later phases should be 공공데이터포털 법원경매정보 Open API (data.go.kr).",
+  "synthesis_note": "These fixtures are the regression-test oracle for crawler/parse.py — hand-authored HTML + expected JSON covering use_type {아파트, 다세대, 토지, 근린생활시설} and failed_count {0,1,2,3}. They are no longer the runtime data source: crawler/live.py now scrapes courtauction.go.kr via Playwright and seeds data/auctionote.db. See fixtures/LIVE_CRAWL_NOTES.md for the live-crawl story.",
   "coverage": {
     "use_types": [
       "근린생활시설",

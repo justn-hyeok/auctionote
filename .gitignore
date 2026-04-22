@@ -7,5 +7,6 @@ __pycache__/
 data/*
 !data/.gitkeep
 !data/auctionote.db
+probe/
 .streamlit/secrets.toml
 .DS_Store
