@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import logging
 import sys
+from datetime import date
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -15,6 +17,9 @@ import plotly.express as px  # noqa: E402
 import streamlit as st  # noqa: E402
 from streamlit_folium import st_folium  # noqa: E402
 
+from analysis.geocode import geocode_item  # noqa: E402
+from analysis.insights import quality_summary, screen_items  # noqa: E402
+from analysis.market import market_signals  # noqa: E402
 from analysis.schema import AuctionItem  # noqa: E402
 from analysis.stats import failed_count_discount_stats  # noqa: E402
 from crawler.parse import parse_detail  # noqa: E402
@@ -23,23 +28,23 @@ from storage.sqlite import init_db, load_all, save  # noqa: E402
 DB_PATH = ROOT / "data" / "auctionote.db"
 FIXTURES_RAW = ROOT / "fixtures" / "raw"
 
-COURT_COORDS: dict[str, tuple[float, float]] = {
-    "서울중앙지방법원": (37.4944, 127.0075),
-    "서울동부지방법원": (37.5274, 127.1289),
-    "서울남부지방법원": (37.5152, 126.8696),
-    "서울북부지방법원": (37.6393, 127.0168),
-    "서울서부지방법원": (37.5655, 126.9083),
-    "수원지방법원": (37.2683, 127.0287),
-    "인천지방법원": (37.4472, 126.7052),
-    "대전지방법원": (36.3395, 127.4310),
-    "대구지방법원": (35.8557, 128.5823),
-    "부산지방법원": (35.1547, 129.0619),
-    "광주지방법원": (35.1581, 126.8508),
-    "의정부지방법원": (37.7380, 127.0368),
-    "춘천지방법원": (37.8813, 127.7298),
-}
-
 logger = logging.getLogger(__name__)
+
+
+def _pct(value: float | None) -> str:
+    if value is None:
+        return "-"
+    return f"{value:.1%}"
+
+
+def _won(value: float | int | None) -> str:
+    if value is None:
+        return "-"
+    return f"{value:,.0f}원"
+
+
+def _item_key(item: AuctionItem) -> tuple[str, int]:
+    return (item.case_no, item.item_no)
 
 
 def _seed_db(db_path: Path) -> None:
@@ -98,6 +103,78 @@ def _render() -> None:
         st.warning("필터 결과 없음")
         return
 
+    screened = screen_items(filtered, today=date.today())
+    market_by_key = {
+        _item_key(signal.item): signal
+        for signal in market_signals(filtered)
+    }
+    flagged_count = sum(1 for result in screened if result.flags)
+    discount_values = [result.discount_rate for result in screened]
+    price_per_m2_values = [
+        result.min_bid_price_per_m2
+        for result in screened
+        if result.min_bid_price_per_m2 is not None
+    ]
+    value_gap_count = sum(
+        1
+        for signal in market_by_key.values()
+        if signal.value_gap_rate is not None and signal.value_gap_rate >= 0.15
+    )
+
+    st.subheader("요약")
+    kpi_cols = st.columns(5)
+    kpi_cols[0].metric("물건 수", f"{len(filtered):,}건")
+    kpi_cols[1].metric("평균 할인율", _pct(sum(discount_values) / len(discount_values)))
+    kpi_cols[2].metric(
+        "중앙 ㎡당 최저가",
+        _won(pd.Series(price_per_m2_values).median() if price_per_m2_values else None),
+    )
+    kpi_cols[3].metric("시세갭 15%+", f"{value_gap_count:,}건")
+    kpi_cols[4].metric("품질 확인 필요", f"{flagged_count:,}건")
+
+    st.subheader("검토 우선순위")
+    rows: list[dict[str, Any]] = []
+    for result in screened[:15]:
+        signal = market_by_key.get(_item_key(result.item))
+        value_gap = (
+            signal.value_gap_rate * 100
+            if signal is not None and signal.value_gap_rate is not None
+            else None
+        )
+        rows.append(
+            {
+                "점수": result.screening_score,
+                "사건": result.item.case_no,
+                "법원": result.item.court,
+                "매각기일": result.item.auction_date,
+                "유찰": result.item.failed_count,
+                "할인율": result.discount_rate * 100,
+                "㎡당 최저가": result.min_bid_price_per_m2,
+                "지역 대비": result.region_price_per_m2_ratio,
+                "시세갭": value_gap,
+                "시세신뢰": signal.confidence if signal is not None else "low",
+                "용도": result.item.use_type,
+                "확인": ", ".join(result.flags),
+                "주소": result.item.address,
+            }
+        )
+    df_screened = pd.DataFrame(rows)
+    st.dataframe(
+        df_screened,
+        use_container_width=True,
+        column_config={
+            "할인율": st.column_config.NumberColumn(format="%.1f%%"),
+            "㎡당 최저가": st.column_config.NumberColumn(format="%,.0f원"),
+            "지역 대비": st.column_config.NumberColumn(format="%.2f배"),
+            "시세갭": st.column_config.NumberColumn(format="%.1f%%"),
+        },
+    )
+
+    summary = quality_summary(filtered)
+    if summary:
+        st.subheader("데이터 품질 체크")
+        st.dataframe(pd.DataFrame(summary), use_container_width=True)
+
     st.subheader("유찰횟수별 평균 할인율")
     stats = failed_count_discount_stats(filtered)
     df_stats = pd.DataFrame(stats)
@@ -134,20 +211,25 @@ def _render() -> None:
     )
     st.dataframe(df_items, use_container_width=True)
 
-    st.subheader("법원별 물건 분포")
-    fmap = folium.Map(location=(36.5, 127.8), zoom_start=7)
-    court_counts: dict[str, int] = {}
+    st.subheader("물건 위치 분포")
+    fmap = folium.Map(location=(37.56, 126.98), zoom_start=11)
+    district_counts: dict[str, int] = {}
+    district_points: dict[str, tuple[float, float]] = {}
     for it in filtered:
-        court_counts[it.court] = court_counts.get(it.court, 0) + 1
-    for court, count in court_counts.items():
-        coord = COURT_COORDS.get(court)
-        if coord is None:
-            logger.warning("no coordinates mapped for court: %s", court)
+        point = geocode_item(it)
+        if point is None:
+            logger.warning(
+                "no approximate coordinates mapped for address: %s", it.address
+            )
             continue
+        district_counts[point.district] = district_counts.get(point.district, 0) + 1
+        district_points[point.district] = (point.latitude, point.longitude)
+    for district, count in district_counts.items():
+        coord = district_points[district]
         folium.CircleMarker(
             location=coord,
             radius=6 + count * 2,
-            popup=f"{court}: {count}건",
+            popup=f"{district}: {count}건",
             color="#1f77b4",
             fill=True,
             fill_opacity=0.6,

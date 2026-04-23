@@ -11,9 +11,15 @@
 수도권 진행중 경매 물건을 기준으로 다음을 보여준다:
 
 - 유찰 횟수별 감정가 대비 최저가 **평균/중앙 할인율**
+- 감정가 대비 할인율 / ㎡당 최저가 / 지역 대비 가격으로 계산한 **검토 우선순위**
+- 현재 수집 데이터 안에서 계산한 휴리스틱 **시세갭 / 신뢰도**
+- 장기 유찰, 면적 누락, 유찰 대비 할인율 불일치 같은 **데이터 품질 플래그**
 - 물건용도 / 최소 유찰횟수 / 법원 필터 (사이드바)
 - 물건 목록 테이블
-- 법원 소재지 기준 folium 지도
+- 주소에서 추출한 서울 구 중심점 기준 folium 지도
+
+미스고부동산 지원 맥락에서 제품 방향과 후속 로드맵을 정리한 보고서는
+[`docs/MISSGO_RESEARCH_REPORT.md`](docs/MISSGO_RESEARCH_REPORT.md)에 있다.
 
 ## Stack
 
@@ -33,6 +39,8 @@
 `data/auctionote.db`는 [courtauction.go.kr](https://www.courtauction.go.kr) 물건상세검색을 **Playwright headless Chromium**으로 돌려 받은 실데이터다. 수집 과정과 WebSquare 셀렉터는 [`fixtures/LIVE_CRAWL_NOTES.md`](fixtures/LIVE_CRAWL_NOTES.md).
 
 **현 스냅샷**: 2026-04-22 수집, 서울 5개 지방법원 아파트 기일입찰 2주 윈도우, 총 **37건**. 법원별 분포: 서울중앙 10 · 서울남부 10 · 서울북부 10 · 서울동부 7 · 서울서부 0 (해당 기간 아파트 매물 없음).
+
+현재 기본 라이브 수집 타겟은 서울 5개 법원 × 아파트/다세대주택/오피스텔/근린생활시설/토지이며, `crawler.live.sliding_date_windows`로 14일 제한을 넘는 기간을 나누고 `max_pages`로 보수적 페이지네이션을 시도할 수 있다.
 
 `scripts/collect.py`는 라이브 scrape가 실패하거나 0건이면 `fixtures/raw/detail_*.html` (6개 합성) 로 fallback. 합성 fixture는 `crawler/parse.py` 회귀 테스트용으로 유지된다.
 
@@ -66,6 +74,9 @@ crawler/
 analysis/
   schema.py     # AuctionItem 데이터 계약
   stats.py      # 유찰-할인율, 지역별, 용도별 집계
+  insights.py   # 후보 랭킹 + 데이터 품질 플래그
+  geocode.py    # 서울 구 중심점 기반 오프라인 geocoding
+  market.py     # 데이터셋 내부 기준 휴리스틱 시세 신호
 storage/
   sqlite.py     # SQLite CRUD + upsert
 dashboard/
@@ -91,11 +102,10 @@ tests/          # 파서·통계·저장 레이어 단위 테스트
 
 ## 한계
 
-- **용도·지역 커버리지 좁음**: 현재 서울 5개 법원 × 아파트만 scrape. 단독·다세대·오피스텔·토지 등은 target 추가 필요.
-- **페이지네이션 미구현**: 검색 결과 10건/페이지에서 멈춤. 페이징 버튼 클릭 루프 추가해야 함.
-- **2주 윈도우 제약**: 사이트 자체 제한. 슬라이딩 윈도우로 확장 가능.
+- **실데이터 스냅샷 협소**: DB에 커밋된 스냅샷은 아직 서울 5개 법원 × 아파트 중심 37건이다.
+- **페이지네이션 검증 필요**: 보수적 클릭 루프는 추가했지만 WebSquare UI 변경에 민감해 라이브 재검증이 필요하다.
 - **낙찰가 이력 미수집**: 상세 페이지의 기일별 결과 추출 로직 추가 필요.
-- **주소 → 좌표 geocoding 미적용**: 지도의 마커 위치는 법원 소재지 기준.
+- **좌표 정밀도 낮음**: 현재 지도는 API 없이 서울 구 중심점으로 표시한다. 실제 필지 좌표 geocoding 필요.
 - **증분 크롤링 미지원**: 현 `scripts/collect.py`는 전체 재수집 전제.
 - **Playwright 의존**: WebSquare UI 변경에 민감. 장기적으로 data.go.kr Open API로 교체 권장.
 

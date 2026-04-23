@@ -17,6 +17,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import TypeAlias
 
 from playwright.sync_api import Page, sync_playwright
 
@@ -26,15 +27,45 @@ logger = logging.getLogger(__name__)
 
 INDEX_URL = "https://www.courtauction.go.kr/pgj/index.on"
 
-_SEARCH_MENU = "#mf_wfm_header_anc_auctnGdsMain"
-_COURT_SELECT = "#mf_wfm_mainFrame_sbx_rletCortOfc"
-_DATE_START = "#mf_wfm_mainFrame_cal_rletPerdStr_input"
-_DATE_END = "#mf_wfm_mainFrame_cal_rletPerdEnd_input"
-_LCL = "#mf_wfm_mainFrame_sbx_rletLclLst"
-_MCL = "#mf_wfm_mainFrame_sbx_rletMclLst"
-_SCL = "#mf_wfm_mainFrame_sbx_rletSclLst"
-_SEARCH_BTN = "#mf_wfm_mainFrame_btn_gdsDtlSrch"
-_RESULT_TABLE = "#mf_wfm_mainFrame_grd_gdsDtlSrchResult_body_table"
+GridRows: TypeAlias = list[list[str]]
+DateWindow: TypeAlias = tuple[date, date]
+
+
+@dataclass(frozen=True)
+class SearchSelectors:
+    search_menu: str
+    court_select: str
+    date_start: str
+    date_end: str
+    lcl: str
+    mcl: str
+    scl: str
+    search_button: str
+    result_table: str
+    next_page_controls: tuple[str, ...]
+
+
+SELECTORS = SearchSelectors(
+    search_menu="#mf_wfm_header_anc_auctnGdsMain",
+    court_select="#mf_wfm_mainFrame_sbx_rletCortOfc",
+    date_start="#mf_wfm_mainFrame_cal_rletPerdStr_input",
+    date_end="#mf_wfm_mainFrame_cal_rletPerdEnd_input",
+    lcl="#mf_wfm_mainFrame_sbx_rletLclLst",
+    mcl="#mf_wfm_mainFrame_sbx_rletMclLst",
+    scl="#mf_wfm_mainFrame_sbx_rletSclLst",
+    search_button="#mf_wfm_mainFrame_btn_gdsDtlSrch",
+    result_table="#mf_wfm_mainFrame_grd_gdsDtlSrchResult_body_table",
+    next_page_controls=(
+        "[id*='grd_gdsDtlSrchResult'][id*='next']",
+        "[id*='grd_gdsDtlSrchResult'][class*='next']",
+        "[id*='grd_gdsDtlSrchResult'][title*='다음']",
+        "[id*='grd_gdsDtlSrchResult'][aria-label*='다음']",
+        "a[title*='다음']",
+        "button[title*='다음']",
+        "a[aria-label*='다음']",
+        "button[aria-label*='다음']",
+    ),
+)
 
 SEOUL_COURTS = [
     "서울중앙지방법원",
@@ -53,10 +84,21 @@ class SearchTarget:
     scl: str
 
 
+_DEFAULT_PROPERTY_TYPES: tuple[tuple[str, str, str], ...] = (
+    ("건물", "주거용건물", "아파트"),
+    ("건물", "주거용건물", "다세대주택"),
+    ("건물", "주거용건물", "오피스텔"),
+    ("건물", "상업용및업무용건물", "근린생활시설"),
+    # Keep land broad unless a narrower land subtype is explicitly requested.
+    ("토지", "", ""),
+)
+
+
 def default_targets() -> list[SearchTarget]:
     return [
-        SearchTarget(court=c, lcl="건물", mcl="주거용건물", scl="아파트")
-        for c in SEOUL_COURTS
+        SearchTarget(court=court, lcl=lcl, mcl=mcl, scl=scl)
+        for court in SEOUL_COURTS
+        for lcl, mcl, scl in _DEFAULT_PROPERTY_TYPES
     ]
 
 
@@ -113,27 +155,44 @@ def _failed_count(text: str) -> int:
 def _select_and_settle(
     page: Page, selector: str, label: str, pause_ms: int = 1200
 ) -> None:
+    if not label:
+        return
     page.select_option(selector, label=label)
     page.wait_for_timeout(pause_ms)
 
 
-def _run_search(
-    page: Page, target: SearchTarget, start: str, end: str
-) -> list[list[str]]:
-    page.goto(INDEX_URL, wait_until="domcontentloaded", timeout=60_000)
-    page.wait_for_timeout(6_000)
-    page.click(_SEARCH_MENU)
-    page.wait_for_timeout(5_000)
-    _select_and_settle(page, _COURT_SELECT, target.court, 600)
-    page.fill(_DATE_START, start)
-    page.fill(_DATE_END, end)
-    page.wait_for_timeout(500)
-    _select_and_settle(page, _LCL, target.lcl, 1500)
-    _select_and_settle(page, _MCL, target.mcl, 1500)
-    _select_and_settle(page, _SCL, target.scl, 500)
-    page.click(_SEARCH_BTN)
-    page.wait_for_timeout(9_000)
-    return page.evaluate(
+def sliding_date_windows(
+    start: date, total_days: int, *, max_window_days: int = 14
+) -> list[DateWindow]:
+    if total_days < 0:
+        raise ValueError("total_days must be >= 0")
+    if max_window_days < 1:
+        raise ValueError("max_window_days must be >= 1")
+
+    windows: list[DateWindow] = []
+    final_day = start + timedelta(days=total_days)
+    window_start = start
+    while window_start <= final_day:
+        window_end = min(window_start + timedelta(days=max_window_days), final_day)
+        windows.append((window_start, window_end))
+        window_start = window_end + timedelta(days=1)
+    return windows
+
+
+def _normalize_grid_rows(raw_rows: object) -> GridRows:
+    if not isinstance(raw_rows, list):
+        return []
+
+    rows: GridRows = []
+    for raw_row in raw_rows:
+        if not isinstance(raw_row, list):
+            continue
+        rows.append([str(cell).strip() for cell in raw_row])
+    return rows
+
+
+def _current_grid_rows(page: Page) -> GridRows:
+    raw_rows = page.evaluate(
         """(sel) => {
             const tbl = document.querySelector(sel);
             if (!tbl) return [];
@@ -141,12 +200,100 @@ def _run_search(
                 Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim())
             );
         }""",
-        _RESULT_TABLE,
+        SELECTORS.result_table,
     )
+    return _normalize_grid_rows(raw_rows)
+
+
+def _try_advance_results_page(page: Page) -> bool:
+    try:
+        advanced = page.evaluate(
+            """({ tableSelector, nextSelectors }) => {
+                const table = document.querySelector(tableSelector);
+                if (!table) return false;
+
+                const roots = [];
+                let root = table.parentElement;
+                for (let i = 0; root && i < 6; i += 1) {
+                    roots.push(root);
+                    root = root.parentElement;
+                }
+
+                const isUsable = (el) => {
+                    const style = window.getComputedStyle(el);
+                    const ariaDisabled = el.getAttribute("aria-disabled") === "true";
+                    const disabled = Boolean(el.disabled) || ariaDisabled;
+                    const hidden = style.display === "none" ||
+                        style.visibility === "hidden" ||
+                        el.offsetParent === null;
+                    return !disabled && !hidden;
+                };
+
+                const selector = nextSelectors.join(",");
+                for (const root of roots) {
+                    for (const el of Array.from(root.querySelectorAll(selector))) {
+                        if (isUsable(el)) {
+                            el.click();
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }""",
+            {
+                "tableSelector": SELECTORS.result_table,
+                "nextSelectors": list(SELECTORS.next_page_controls),
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("result pagination unavailable: %s", exc)
+        return False
+    return bool(advanced)
+
+
+def _rows_from_current_grid_and_advance(page: Page) -> tuple[GridRows, bool]:
+    rows = _current_grid_rows(page)
+    advanced = _try_advance_results_page(page)
+    if advanced:
+        page.wait_for_timeout(2_000)
+    return rows, advanced
+
+
+def _run_search(
+    page: Page, target: SearchTarget, start: str, end: str, *, max_pages: int = 1
+) -> GridRows:
+    if max_pages < 1:
+        raise ValueError("max_pages must be >= 1")
+
+    page.goto(INDEX_URL, wait_until="domcontentloaded", timeout=60_000)
+    page.wait_for_timeout(6_000)
+    page.click(SELECTORS.search_menu)
+    page.wait_for_timeout(5_000)
+    _select_and_settle(page, SELECTORS.court_select, target.court, 600)
+    page.fill(SELECTORS.date_start, start)
+    page.fill(SELECTORS.date_end, end)
+    page.wait_for_timeout(500)
+    _select_and_settle(page, SELECTORS.lcl, target.lcl, 1500)
+    _select_and_settle(page, SELECTORS.mcl, target.mcl, 1500)
+    _select_and_settle(page, SELECTORS.scl, target.scl, 500)
+    page.click(SELECTORS.search_button)
+    page.wait_for_timeout(9_000)
+
+    rows: GridRows = []
+    for page_no in range(max_pages):
+        if page_no == max_pages - 1:
+            rows.extend(_current_grid_rows(page))
+            break
+
+        page_rows, advanced = _rows_from_current_grid_and_advance(page)
+        rows.extend(page_rows)
+        if not advanced:
+            break
+    return rows
 
 
 def _rows_to_items(
-    rows: list[list[str]], target: SearchTarget
+    rows: GridRows, target: SearchTarget
 ) -> list[AuctionItem]:
     items: list[AuctionItem] = []
     i = 0
@@ -207,11 +354,14 @@ def scrape_auctions(
     targets: list[SearchTarget] | None = None,
     *,
     days_window: int = 14,
+    max_pages: int = 1,
 ) -> list[AuctionItem]:
+    if max_pages < 1:
+        raise ValueError("max_pages must be >= 1")
+
     targets = targets or default_targets()
     today = date.today()
-    start = today.strftime("%Y.%m.%d")
-    end = (today + timedelta(days=days_window)).strftime("%Y.%m.%d")
+    date_windows = sliding_date_windows(today, days_window)
 
     all_items: list[AuctionItem] = []
     seen: set[tuple[str, int]] = set()
@@ -230,26 +380,35 @@ def scrape_auctions(
         page.set_default_timeout(60_000)
 
         for target in targets:
-            logger.info(
-                "scraping %s | %s > %s > %s",
-                target.court, target.lcl, target.mcl, target.scl,
-            )
-            try:
-                rows = _run_search(page, target, start, end)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("search failed for %s: %s", target.court, exc)
-                continue
-            items = _rows_to_items(rows, target)
-            fresh = [
-                it for it in items
-                if (it.case_no, it.item_no) not in seen
-            ]
-            for it in fresh:
-                seen.add((it.case_no, it.item_no))
-            logger.info(
-                "→ %d rows, %d records (%d new)",
-                len(rows), len(items), len(fresh),
-            )
-            all_items.extend(fresh)
+            for start_date, end_date in date_windows:
+                start = start_date.strftime("%Y.%m.%d")
+                end = end_date.strftime("%Y.%m.%d")
+                logger.info(
+                    "scraping %s | %s > %s > %s | %s-%s",
+                    target.court, target.lcl, target.mcl, target.scl, start, end,
+                )
+                try:
+                    rows = _run_search(page, target, start, end, max_pages=max_pages)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(
+                        "search failed for %s (%s-%s): %s",
+                        target.court,
+                        start,
+                        end,
+                        exc,
+                    )
+                    continue
+                items = _rows_to_items(rows, target)
+                fresh = [
+                    it for it in items
+                    if (it.case_no, it.item_no) not in seen
+                ]
+                for it in fresh:
+                    seen.add((it.case_no, it.item_no))
+                logger.info(
+                    "→ %d rows, %d records (%d new)",
+                    len(rows), len(items), len(fresh),
+                )
+                all_items.extend(fresh)
         browser.close()
     return all_items
