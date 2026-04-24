@@ -24,6 +24,11 @@ Streamlit Community Cloud 공개 데모는 단순 모드로 운영한다.
 git push origin main
 ```
 
+## Keepalive
+
+`.github/workflows/keepalive.yml`이 6시간마다 Playwright로 공개 앱 URL을 한 번 연다.
+Streamlit Community Cloud의 sleep 모드를 줄이기 위한 best-effort 작업이며, 수동 실행도 가능하다.
+
 ## 선택 로컬 스택
 
 PostgreSQL/Elasticsearch까지 확인하고 싶을 때만 로컬에서 실행한다.
