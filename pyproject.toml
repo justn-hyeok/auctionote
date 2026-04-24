@@ -11,6 +11,9 @@ dependencies = [
     "folium>=0.16",
     "streamlit>=1.35",
     "streamlit-folium>=0.20",
+    "elasticsearch>=8.15,<9",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
 ]
 
 [dependency-groups]

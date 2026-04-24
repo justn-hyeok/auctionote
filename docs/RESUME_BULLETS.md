@@ -2,18 +2,19 @@
 
 ## 기본 버전
 
-- 법원경매 WebSquare UI를 Playwright로 자동화해 경매 물건 데이터를 수집하고, SQLite 기반 저장소와 Streamlit 대시보드를 구현
+- 법원경매 WebSquare UI를 Playwright로 자동화해 경매 물건 데이터를 수집하고, PostgreSQL/SQLAlchemy ORM 저장소·Elasticsearch 검색·Streamlit 대시보드를 구현
 - 유찰횟수, 면적당 가격, 후보 랭킹, 데이터 품질 플래그를 조합해 경매 물건 검토 우선순위와 지도 기반 탐색 기능 설계
+- PostgreSQL primary storage, Elasticsearch bulk indexing, SQLite fallback을 구성해 로컬 데모 환경에서도 깨지지 않는 키워드 검색/구조화 필터 제공
 
 ## 미스고 지원용 버전
 
 - 미스고부동산의 데이터맵·AI가치평가 방향을 참고해 법원경매 데이터를 수집하고, 유찰횟수·감정가·최저가·면적·지역 기반의 검토 우선순위와 휴리스틱 시세갭을 계산하는 분석 프로토타입 구축
-- WebSquare 기반 공공 사이트 자동화, 데이터 정규화, fixture 회귀 테스트, SQLite 저장, Streamlit 시각화까지 end-to-end로 구현하며 경매 데이터가 투자 판단 정보로 변환되는 흐름 학습
+- WebSquare 기반 공공 사이트 자동화, 데이터 정규화, fixture 회귀 테스트, PostgreSQL/SQLite 저장, Elasticsearch 색인, Streamlit 시각화까지 end-to-end로 구현하며 경매 데이터가 투자 판단 정보로 변환되는 흐름 학습
 
 ## 짧은 버전
 
 - Playwright로 법원경매 WebSquare UI를 자동화해 경매 물건 데이터 수집 파이프라인 구현
-- SQLite·Streamlit 기반으로 경매 물건 랭킹, 시세갭, 지도 탐색 대시보드 구축
+- PostgreSQL·SQLAlchemy ORM·Elasticsearch·Streamlit 기반으로 경매 물건 검색, 랭킹, 시세갭, 지도 탐색 대시보드 구축
 
 ## 면접에서 말하기 좋은 포인트
 
@@ -24,6 +25,8 @@
 2. 기술적으로 어려웠던 점
 
 - 법원경매 사이트가 정적 HTML이 아니라 WebSquare UI라서 브라우저 자동화가 필요했고, 결과 grid 구조도 일반 테이블과 달라 실제 렌더링 이후 데이터를 읽어야 했다
+- SQLite 스냅샷을 PostgreSQL로 이관하고 SQLAlchemy ORM 모델을 통해 upsert/load/filter 저장소 계층을 분리했다
+- Elasticsearch를 선택적으로 붙이되 Streamlit Cloud 같은 가벼운 데모 환경에서는 SQLite fallback으로 유지되게 설계했다
 
 3. 무엇을 배웠는가
 

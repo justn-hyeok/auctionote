@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -27,6 +28,8 @@ from storage.sqlite import init_db, load_all, save  # noqa: E402
 
 DB_PATH = ROOT / "data" / "auctionote.db"
 FIXTURES_RAW = ROOT / "fixtures" / "raw"
+ELASTIC_URL = os.getenv("AUCTIONOTE_ELASTIC_URL")
+DATABASE_URL = os.getenv("AUCTIONOTE_DATABASE_URL")
 
 logger = logging.getLogger(__name__)
 
@@ -59,18 +62,59 @@ def _seed_db(db_path: Path) -> None:
 
 
 @st.cache_data
-def _load_items(db_path_str: str) -> list[AuctionItem]:
+def _load_items(db_path_str: str, database_url: str | None) -> list[AuctionItem]:
+    if database_url:
+        try:
+            from storage.postgres import load_all as load_all_postgres
+
+            return load_all_postgres(database_url)
+        except Exception as exc:
+            logger.info("PostgreSQL unavailable, falling back to SQLite: %s", exc)
+
     p = Path(db_path_str)
     if not p.exists():
         _seed_db(p)
     return load_all(p)
 
 
+def _filter_items_in_memory(
+    items: list[AuctionItem],
+    *,
+    query: str,
+    selected_uses: list[str],
+    min_failed: int,
+    selected_courts: list[str],
+) -> list[AuctionItem]:
+    query_terms = query.strip().lower().split()
+    filtered: list[AuctionItem] = []
+    for item in items:
+        if item.use_type not in selected_uses:
+            continue
+        if item.failed_count < min_failed:
+            continue
+        if item.court not in selected_courts:
+            continue
+        if query_terms:
+            haystack = " ".join(
+                [
+                    item.case_no,
+                    item.court,
+                    item.address,
+                    item.use_type,
+                    item.status,
+                ]
+            ).lower()
+            if not all(term in haystack for term in query_terms):
+                continue
+        filtered.append(item)
+    return filtered
+
+
 def _render() -> None:
     st.set_page_config(page_title="auctionote", layout="wide")
     st.title("auctionote")
 
-    items = _load_items(str(DB_PATH))
+    items = _load_items(str(DB_PATH), DATABASE_URL)
     if not items:
         st.info("데이터 없음")
         return
@@ -80,6 +124,7 @@ def _render() -> None:
 
     with st.sidebar:
         st.header("필터")
+        query = st.text_input("키워드 검색", placeholder="예: 강남 아파트 유찰")
         selected_uses = st.multiselect(
             "물건용도", all_use_types, default=all_use_types
         )
@@ -91,17 +136,47 @@ def _render() -> None:
             "법원", all_courts, default=all_courts
         )
 
-    filtered = [
-        it
-        for it in items
-        if it.use_type in selected_uses
-        and it.failed_count >= min_failed
-        and it.court in selected_courts
-    ]
+    if not selected_uses or not selected_courts:
+        filtered = []
+        search_backend = "필터"
+    elif ELASTIC_URL:
+        from search.elastic import create_client, try_search_items
+
+        elastic_results = try_search_items(
+            create_client(ELASTIC_URL),
+            query=query,
+            use_types=selected_uses,
+            courts=selected_courts,
+            min_failed=min_failed,
+            size=500,
+        )
+        if elastic_results is None:
+            filtered = _filter_items_in_memory(
+                items,
+                query=query,
+                selected_uses=selected_uses,
+                min_failed=min_failed,
+                selected_courts=selected_courts,
+            )
+            search_backend = "SQLite fallback"
+        else:
+            filtered = elastic_results
+            search_backend = "Elasticsearch"
+    else:
+        filtered = _filter_items_in_memory(
+            items,
+            query=query,
+            selected_uses=selected_uses,
+            min_failed=min_failed,
+            selected_courts=selected_courts,
+        )
+        search_backend = "SQLite demo"
 
     if not filtered:
         st.warning("필터 결과 없음")
         return
+
+    st.caption(f"검색 백엔드: {search_backend}")
 
     screened = screen_items(filtered, today=date.today())
     market_by_key = {
