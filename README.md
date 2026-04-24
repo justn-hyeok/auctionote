@@ -1,10 +1,20 @@
 # auctionote
 
-> 법원경매 물건을 수집해 유찰 횟수별 할인율을 분석하는 Streamlit 대시보드
+> 법원경매 데이터를 수집해 검토 우선순위, 휴리스틱 시세갭, 지도 분포까지 보여주는 경매 분석 프로토타입
 
 **Live demo**: https://auctionote-g5gndhc2ri3ca5h6qbyappb.streamlit.app/
 
 ![dashboard](docs/screenshots/01_overview.png)
+
+## TL;DR
+
+`auctionote`는 법원경매 WebSquare UI를 Playwright로 자동화해 물건 데이터를 수집하고,
+그 결과를 SQLite와 Streamlit으로 분석하는 프로젝트다.
+
+- 경매 물건 수집: 법원·용도·기간 조건 입력, sliding window, 보수적 pagination
+- 판단 보조 지표: 할인율, ㎡당 최저가, 후보 랭킹, 휴리스틱 시세갭, 데이터 품질 플래그
+- 탐색 UI: 필터, 테이블, 차트, 서울 구 중심점 기반 지도
+- 지원 문서: [`docs/MISSGO_ONE_PAGER.md`](docs/MISSGO_ONE_PAGER.md), [`docs/MISSGO_RESEARCH_REPORT.md`](docs/MISSGO_RESEARCH_REPORT.md), [`docs/RESUME_BULLETS.md`](docs/RESUME_BULLETS.md)
 
 ## What
 
@@ -18,8 +28,10 @@
 - 물건 목록 테이블
 - 주소에서 추출한 서울 구 중심점 기준 folium 지도
 
-미스고부동산 지원 맥락에서 제품 방향과 후속 로드맵을 정리한 보고서는
-[`docs/MISSGO_RESEARCH_REPORT.md`](docs/MISSGO_RESEARCH_REPORT.md)에 있다.
+미스고부동산 지원 맥락에서 바로 읽기 좋은 요약은
+[`docs/MISSGO_ONE_PAGER.md`](docs/MISSGO_ONE_PAGER.md),
+상세 보고서는 [`docs/MISSGO_RESEARCH_REPORT.md`](docs/MISSGO_RESEARCH_REPORT.md),
+이력서 문구는 [`docs/RESUME_BULLETS.md`](docs/RESUME_BULLETS.md)에 정리했다.
 
 ## Stack
 
